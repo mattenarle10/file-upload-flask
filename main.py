@@ -3,7 +3,7 @@ import json
 import jinja2
 from jinja2 import Environment, PackageLoader, select_autoescape, BaseLoader, FileSystemLoader
 
-from flask import Flask, flash, request, redirect, url_for
+from flask import Flask, flash, request, redirect, url_for, render_template
 from werkzeug.utils import secure_filename
 from db.mongodb.mongodb_connection import create_mongodb_connection
 
@@ -45,7 +45,7 @@ def upload_file():
             client, database, collection = create_mongodb_connection("file-uploads")
 
             result = collection.insert_one({
-                "file_path": file_path
+                "file_path": filename
             })
 
             client.close()
@@ -89,8 +89,10 @@ def show_uploaded_images():
 
     parsed = []
     for d in data:
+        img_url = url_for('download_file', name=d['file_path'])
+
         parsed.append({
-            "image_url": d['file_path']
+            "image_url": img_url
         })
     
     if ENV_MODE == "backend":
@@ -98,14 +100,15 @@ def show_uploaded_images():
             "data": parsed
         })
     else:
+        return render_template('view_images.html', navigation=parsed)
 
-        template_dir = os.path.join(".", 'view_images.html')
-        loader = FileSystemLoader(template_dir)
+        # template_dir = os.path.join(".", 'view_images.html')
+        # loader = FileSystemLoader(template_dir)
 
-        rtemplate = Environment(loader=loader)
-        template = rtemplate.get_template("view_images")
+        # rtemplate = Environment(loader=loader)
+        # template = rtemplate.get_template("view_images")
 
-        return template.render(navigation=parsed, go="here")
+        # return template.render(navigation=parsed)
 
 
 

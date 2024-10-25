@@ -12,6 +12,9 @@ pip install -r requirements.txt
 export MONGODB_DB_CONNECTION_URI=mongodb://localhost:27017/
 export MONGODB_DB_NAME=ecv-jmp-file-upload-app
 export ENV_MODE=frontend
+
+# run the app!
+flask --app main run
 ```
 
 ## Jamby's corner
