@@ -1,10 +1,15 @@
 import os
+import json
+import jinja2
+from jinja2 import Environment, PackageLoader, select_autoescape, BaseLoader, FileSystemLoader
+
 from flask import Flask, flash, request, redirect, url_for
 from werkzeug.utils import secure_filename
 from db.mongodb.mongodb_connection import create_mongodb_connection
 
 UPLOAD_FOLDER = '/tmp'
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
+ENV_MODE = os.getenv("ENV_MODE")
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -17,7 +22,7 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route('/images', methods=['GET', 'POST'])
+@app.route('/upload-file', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
 
@@ -46,16 +51,23 @@ def upload_file():
             client.close()
             img_url = url_for('download_file', name=filename)
 
-            return f'''
-            <!doctype html>
-            <html>
-                <h1>{filename}</h1>
-                <img src={img_url}></img>
-            </html>
-            '''
+            if ENV_MODE == "backend":
+                return {
+                    "filename": filename,
+                    "img_url": img_url
+                }
+            else:
+                return f'''
+                <!doctype html>
+                <html>
+                    <h1>{filename}</h1>
+                    <img src={img_url}></img>
+                </html>
+                '''
             
             
             redirect()
+    
     return '''
     <!doctype html>
     <title>Upload new File</title>
@@ -67,6 +79,35 @@ def upload_file():
     '''
 
 from flask import send_from_directory
+
+@app.route('/images', methods=['GET'])
+def show_uploaded_images():
+    client, database, collection = create_mongodb_connection("file-uploads")
+    data = list(collection.find({}))
+    print(data)
+    print("===")
+
+    parsed = []
+    for d in data:
+        parsed.append({
+            "image_url": d['file_path']
+        })
+    
+    if ENV_MODE == "backend":
+        return json.dumps({
+            "data": parsed
+        })
+    else:
+
+        template_dir = os.path.join(".", 'view_images.html')
+        loader = FileSystemLoader(template_dir)
+
+        rtemplate = Environment(loader=loader)
+        template = rtemplate.get_template("view_images")
+
+        return template.render(navigation=parsed, go="here")
+
+
 
 @app.route('/uploads/<name>')
 def download_file(name):
