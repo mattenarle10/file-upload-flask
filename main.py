@@ -1,6 +1,7 @@
 import os
 from flask import Flask, flash, request, redirect, url_for
 from werkzeug.utils import secure_filename
+from db.mongodb.mongodb_connection import create_mongodb_connection
 
 UPLOAD_FOLDER = '/tmp'
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
@@ -19,11 +20,13 @@ def allowed_file(filename):
 @app.route('/images', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
+
         # check if the post request has the file part
         if 'file' not in request.files:
             flash('No file part')
             return redirect(request.url)
         file = request.files['file']
+
         # If the user does not select a file, the browser submits an
         # empty file without a filename.
         if file.filename == '':
@@ -31,8 +34,28 @@ def upload_file():
             return redirect(request.url)
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            return redirect(url_for('download_file', name=filename))
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(file_path)
+
+            client, database, collection = create_mongodb_connection("file-uploads")
+
+            result = collection.insert_one({
+                "file_path": file_path
+            })
+
+            client.close()
+            img_url = url_for('download_file', name=filename)
+
+            return f'''
+            <!doctype html>
+            <html>
+                <h1>{filename}</h1>
+                <img src={img_url}></img>
+            </html>
+            '''
+            
+            
+            redirect()
     return '''
     <!doctype html>
     <title>Upload new File</title>
