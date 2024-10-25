@@ -1,11 +1,14 @@
 from pymongo import MongoClient
+import os
 
-def create_mongodb_connection(database_name, collection_name):
+def create_mongodb_connection(collection_name):
+    db_name = os.getenv("MONGODB_DB_NAME")
+    uri = os.getenv("MONGODB_DB_CONNECTION_URI")
+
     try:
-        uri = "<connection string URI>"
         client = MongoClient(uri)
-        database = client["<database name>"]
-        collection = database["<collection name>"]
+        database = client[db_name]
+        collection = database[collection_name]
         # start example code here
         # end example code here
         client.close()
