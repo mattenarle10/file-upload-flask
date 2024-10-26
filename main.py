@@ -6,7 +6,7 @@ from flask import Flask, flash, request, redirect, url_for, render_template, sen
 from werkzeug.utils import secure_filename
 from db.mongodb.mongodb_connection import create_mongodb_connection
 
-UPLOAD_FOLDER = '/tmp'
+UPLOAD_FOLDER = os.getenv("UPLOAD_DIRECTORY")
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 ENV_MODE = os.getenv("ENV_MODE")
 
