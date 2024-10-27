@@ -69,6 +69,20 @@ export POSTGRESQL_DB_DATABASE_NAME=ecv_file_upload_app_psql
 export POSTGRESQL_DB_HOST=localhost
 ```
 
+Hint: You can use tmux to leave the web server running. I know there's a better practice to do this, but this is much faster.
+
+```sh
+sudo yum install tmux
+# create a session
+tmux
+
+# list the active sessions
+tmux ls
+
+# reconnect to existing session
+tmux attach -t 0
+```
+
 ### [E] Mount the EFS
 
 ```sh
