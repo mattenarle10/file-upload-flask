@@ -1,8 +1,24 @@
 # ecv-jpm-file-upload-flask
 
-## Basic Setup
+## Deployment to AWS
+
+### [A] Provision the EC2
+
+- Provision 2 EC2 instances, behind an ALB
+
+### [B] Configure the EC2
 
 ```sh
+# https://www.digitalocean.com/community/tutorials/how-to-serve-flask-applications-with-uwsgi-and-nginx-on-centos-7
+sudo yum install python-pip python-devel gcc nginx
+```
+
+### [C] Install the app
+
+```sh
+git clone https://github.com/jamby1100/file-upload-flask
+cd file-upload-flask
+
 python3 -m venv venv
 source venv/bin/activate
 
@@ -24,6 +40,73 @@ flask --app main run
 # use this when in ec2
 flask --app main run --host 0.0.0.0
 ```
+
+At this stage, you should be able to see hello world at the homepage.
+But the other pages would error.
+
+### [D] Provision needed AWS Services
+
+1. AWS RDS
+2. AWS DocumentDB
+3. EFS
+
+Once RDS is installed, you have to run this command to create the table
+
+```sh
+python db/postgresql/init_db.py
+```
+
+And ofcourse, you need a fresh set of environment variables. Ofcourse, change according to the new values from your newly provisioned resources:
+
+```sh
+export UPLOAD_DIRECTORY='/tmp'
+export MONGODB_DB_CONNECTION_URI=mongodb://localhost:27017/
+export MONGODB_DB_NAME=ecv-jmp-file-upload-app
+export ENV_MODE=frontend
+export POSTGRESQL_DB_USERNAME=flask_photo_app_admin
+export POSTGRESQL_DB_PASSWORD='sac2c2qec1131DSq@#1'
+export POSTGRESQL_DB_DATABASE_NAME=ecv_file_upload_app_psql
+export POSTGRESQL_DB_HOST=localhost
+```
+
+### [E] Mount the EFS
+
+```sh
+# create the efs
+# https://ap-southeast-1.console.aws.amazon.com/efs/home?region=ap-southeast-1#/file-systems/fs-0ab4558735bb03da5?tabId=mounts
+
+# check if installed
+sudo yum list installed | grep amazon-efs-utils
+
+# install the tool
+sudo yum -y install amazon-efs-utils
+
+# create the damn folder
+# https://docs.aws.amazon.com/efs/latest/ug/mounting-fs-mount-helper-ec2-linux.html
+sudo mkdir efs
+
+# mount the damn thing
+sudo mount -t efs -o tls fs-0ab4558735bb03da5:/ efs
+
+sudo chown -R $USER ~/efs
+sudo chgrp -R $USER ~/efs
+
+# ensure port 22 and 2049
+
+
+# check if mounted already
+df -h
+```
+
+### [F] Test the app
+
+- visit `http://127.0.0.1:5000/images`
+
+
+### [G] Resources
+
+- The app is contained almost exclusively on main.py
+- Need more context on Flask? Visit `https://flask.palletsprojects.com/en/stable/quickstart/`
 
 ## Jamby's corner
 
@@ -75,7 +158,7 @@ http://127.0.0.1:5000/images
 ## Installation on EC2
 
 ```sh
-sudo yum install python-pip python-devel gcc nginx
+
 git clone https://github.com/jamby1100/file-upload-flask.git
 cd file-upload-flask/
 
@@ -83,6 +166,9 @@ python3 -m venv venv
 source venv/bin/activate
 
 pip install -r requirements.txt
+
+
+# https://medium.com/@zghanem/troubleshooting-efs-mounting-volume-failed-mount-unknown-filesystem-type-efs-in-ecs-tasks-6de59137a653
 
 
 ```
