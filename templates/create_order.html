@@ -4,7 +4,7 @@
     <title>Create Order | PixelStore</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700&display=swap"rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -76,7 +76,7 @@
                                     <option value="{{ product[0] }}" 
                                             data-stock="{{ product[2] }}"
                                             data-name="{{ product[1] }}"
-                                            data-image-url="/uploads/{{ product[3] if product|length > 3 and product[3] else 'placeholder.png' }}">
+                                            data-image-id="{{ product[3] if product|length > 3 and product[3] else '' }}">
                                         {{ product[1] }} (Stock: {{ product[2] }})
                                     </option>
                                 {% endfor %}
@@ -96,7 +96,7 @@
                             <div class="border-2 border-purple-500 rounded-md p-4 bg-gray-700">
                                 <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
                                     <div class="w-full md:w-1/2">
-                                        <img id="product-image" src="" alt="Product Image" class="w-full h-48 object-cover rounded-md">
+                                        <img id="product-image" src="" alt="Product Image" class="w-full h-48 object-cover rounded-md bg-gray-600">
                                     </div>
                                     <div class="w-full md:w-1/2 space-y-2">
                                         <h3 id="product-name" class="text-lg font-pixel text-green-400"></h3>
@@ -191,12 +191,31 @@
                 productName.textContent = selectedOption.dataset.name;
                 productStock.textContent = selectedOption.dataset.stock;
                 
-                // Try to load the product image
-                productImage.src = selectedOption.dataset.imageUrl;
-                productImage.onerror = function() {
-                    // If image fails to load, use a placeholder
-                    this.src = '/uploads/placeholder.png';
-                };
+                // Get the image ID from the data attribute
+                const imageId = selectedOption.dataset.imageId;
+                
+                if (imageId && imageId.trim() !== '') {
+                    // Fetch the image from the images endpoint
+                    fetch('/image/' + imageId)
+                        .then(response => {
+                            if (response.ok) {
+                                return response.blob();
+                            }
+                            throw new Error('Image not found');
+                        })
+                        .then(blob => {
+                            const imageUrl = URL.createObjectURL(blob);
+                            productImage.src = imageUrl;
+                        })
+                        .catch(error => {
+                            console.error('Error loading image:', error);
+                            // Use a fallback image
+                            productImage.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2FhYSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxyZWN0IHg9IjMiIHk9IjMiIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgcng9IjIiIHJ5PSIyIj48L3JlY3Q+PGNpcmNsZSBjeD0iOC41IiBjeT0iOC41IiByPSIxLjUiPjwvY2lyY2xlPjxwb2x5bGluZSBwb2ludHM9IjIxIDE1IDE2IDEwIDUgMTUiPjwvcG9seWxpbmU+PC9zdmc+';
+                        });
+                } else {
+                    // No image ID, use a fallback image
+                    productImage.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2FhYSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxyZWN0IHg9IjMiIHk9IjMiIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgcng9IjIiIHJ5PSIyIj48L3JlY3Q+PGNpcmNsZSBjeD0iOC41IiBjeT0iOC41IiByPSIxLjUiPjwvY2lyY2xlPjxwb2x5bGluZSBwb2ludHM9IjIxIDE1IDE2IDEwIDUgMTUiPjwvcG9seWxpbmU+PC9zdmc+';
+                }
                 
                 // Show product preview, hide "no product selected" message
                 productPreview.classList.remove('hidden');
