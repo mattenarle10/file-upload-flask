@@ -314,7 +314,7 @@ def create_order():
                 conn.commit()
                 
                 flash(f'Order #{order_id} created successfully for {product_name}')
-                return redirect(url_for('show_uploaded_images'))
+                return redirect(url_for('create_order'))  # Redirect back to see the new order in the list
                 
             except psycopg2.Error as e:
                 conn.rollback()
@@ -400,16 +400,81 @@ def create_order():
             
             parsed_products.append(product_data)
         
+        # Fetch recent orders for display
+        orders = []
+        try:
+            # Check if orders table exists first
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'orders'
+                )
+            """)
+            table_exists = cur.fetchone()[0]
+            
+            if table_exists:
+                # Get recent orders with product details
+                cur.execute("""
+                    SELECT o.id, o.product_id, p.name, o.quantity, o.order_date, p.image_mongodb_id 
+                    FROM orders o
+                    JOIN products p ON o.product_id = p.id
+                    ORDER BY o.order_date DESC
+                    LIMIT 10
+                """)
+                
+                recent_orders = cur.fetchall()
+                
+                # Process orders with product images
+                for order in recent_orders:
+                    order_id = order[0]
+                    product_id = order[1]
+                    product_name = order[2]
+                    quantity = order[3]
+                    order_date = order[4]
+                    image_mongodb_id = order[5]
+                    
+                    # Find matching image for this product
+                    image_url = ""
+                    
+                    # Try to find by product_id in MongoDB
+                    for img in all_images:
+                        if 'product_id' in img and str(img['product_id']) == str(product_id):
+                            if 'file_path' in img:
+                                image_url = url_for('download_file', name=img['file_path'])
+                            break
+                    
+                    # If no match by product_id, try by image_mongodb_id
+                    if not image_url and image_mongodb_id:
+                        for img in all_images:
+                            if '_id' in img and str(img['_id']) == image_mongodb_id:
+                                if 'file_path' in img:
+                                    image_url = url_for('download_file', name=img['file_path'])
+                                break
+                    
+                    order_data = {
+                        "order_id": order_id,
+                        "product_id": product_id,
+                        "product_name": product_name,
+                        "quantity": quantity,
+                        "order_date": order_date,
+                        "image_url": image_url
+                    }
+                    
+                    orders.append(order_data)
+        except Exception as e:
+            app.logger.error(f"Error fetching orders: {e}")
+            # Continue without orders if there's an error
+        
         client.close()
         cur.close()
         conn.close()
         
-        return render_template('create_order.html', products=parsed_products)
+        return render_template('create_order.html', products=parsed_products, orders=orders)
         
     except Exception as e:
         app.logger.error(f"Error loading products: {e}")
         flash('Error loading products')
-        return render_template('create_order.html', products=[])
+        return render_template('create_order.html', products=[], orders=[])
 
 @app.route('/clear-mongodb', methods=['GET'])
 def clear_mongodb():
