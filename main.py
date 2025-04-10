@@ -14,8 +14,9 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route("/")
-def hello_world():
-    return "<p>Hello, World Elisha!</p>"
+def index():
+    # Main landing page with navigation
+    return render_template('index.html')
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -89,16 +90,7 @@ def upload_file():
                     "img_url": img_url
                 }
             else:
-                return f'''
-                <!doctype html>
-                <html>
-                    <h1>{filename}</h1>
-                    <img src={img_url}></img>
-                </html>
-                '''
-            
-            
-            redirect()
+                return redirect(url_for('show_uploaded_images'))
     
     return render_template('upload_image.html')
 
@@ -122,10 +114,21 @@ def show_uploaded_images():
             "data": parsed
         })
     else:
-        return render_template('view_images.html', navigation=parsed)
-
-
+        return render_template('view_images.html', images=parsed)
 
 @app.route('/uploads/<name>')
 def download_file(name):
     return send_from_directory(app.config["UPLOAD_FOLDER"], name)
+
+# Simple redirect routes for better navigation
+@app.route('/home')
+def home():
+    return redirect(url_for('index'))
+
+@app.route('/gallery')
+def gallery():
+    return redirect(url_for('show_uploaded_images'))
+
+@app.route('/upload')
+def upload():
+    return redirect(url_for('upload_file'))
