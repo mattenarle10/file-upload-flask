@@ -4,7 +4,7 @@
     <title>Create Order | PixelStore</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700&display=swap"rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -73,11 +73,11 @@
                                    class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                 <option value="">-- Select a product --</option>
                                 {% for product in products %}
-                                    <option value="{{ product[0] }}" 
-                                            data-stock="{{ product[2] }}"
-                                            data-name="{{ product[1] }}"
-                                            data-image-id="{{ product[3] if product|length > 3 and product[3] else '' }}">
-                                        {{ product[1] }} (Stock: {{ product[2] }})
+                                    <option value="{{ product.product_id }}" 
+                                            data-stock="{{ product.stock_count }}"
+                                            data-name="{{ product.product_name }}"
+                                            data-image-url="{{ product.image_url }}">
+                                        {{ product.product_name }} (Stock: {{ product.stock_count }})
                                     </option>
                                 {% endfor %}
                             </select>
@@ -191,31 +191,20 @@
                 productName.textContent = selectedOption.dataset.name;
                 productStock.textContent = selectedOption.dataset.stock;
                 
-                // Get the image ID from the data attribute
-                const imageId = selectedOption.dataset.imageId;
-                
-                if (imageId && imageId.trim() !== '') {
-                    // Fetch the image from the images endpoint
-                    fetch('/image/' + imageId)
-                        .then(response => {
-                            if (response.ok) {
-                                return response.blob();
-                            }
-                            throw new Error('Image not found');
-                        })
-                        .then(blob => {
-                            const imageUrl = URL.createObjectURL(blob);
-                            productImage.src = imageUrl;
-                        })
-                        .catch(error => {
-                            console.error('Error loading image:', error);
-                            // Use a fallback image
-                            productImage.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2FhYSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxyZWN0IHg9IjMiIHk9IjMiIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgcng9IjIiIHJ5PSIyIj48L3JlY3Q+PGNpcmNsZSBjeD0iOC41IiBjeT0iOC41IiByPSIxLjUiPjwvY2lyY2xlPjxwb2x5bGluZSBwb2ludHM9IjIxIDE1IDE2IDEwIDUgMTUiPjwvcG9seWxpbmU+PC9zdmc+';
-                        });
+                // Set the image URL directly from the data attribute
+                const imageUrl = selectedOption.dataset.imageUrl;
+                if (imageUrl && imageUrl.trim() !== '') {
+                    productImage.src = imageUrl;
                 } else {
-                    // No image ID, use a fallback image
+                    // Use a fallback image if no image URL is available
                     productImage.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2FhYSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxyZWN0IHg9IjMiIHk9IjMiIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgcng9IjIiIHJ5PSIyIj48L3JlY3Q+PGNpcmNsZSBjeD0iOC41IiBjeT0iOC41IiByPSIxLjUiPjwvY2lyY2xlPjxwb2x5bGluZSBwb2ludHM9IjIxIDE1IDE2IDEwIDUgMTUiPjwvcG9seWxpbmU+PC9zdmc+';
                 }
+                
+                // Handle image loading errors
+                productImage.onerror = function() {
+                    this.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2FhYSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxyZWN0IHg9IjMiIHk9IjMiIHdpZHRoPSIxOCIgaGVpZ2h0PSIxOCIgcng9IjIiIHJ5PSIyIj48L3JlY3Q+PGNpcmNsZSBjeD0iOC41IiBjeT0iOC41IiByPSIxLjUiPjwvY2lyY2xlPjxwb2x5bGluZSBwb2ludHM9IjIxIDE1IDE2IDEwIDUgMTUiPjwvcG9seWxpbmU+PC9zdmc+';
+                    this.onerror = null; // Prevent infinite loop
+                };
                 
                 // Show product preview, hide "no product selected" message
                 productPreview.classList.remove('hidden');
