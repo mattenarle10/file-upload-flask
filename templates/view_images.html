@@ -1,49 +1,114 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Image Gallery</title>
+    <title>Image Gallery | PixelStore</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700&display=swap"(https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;700&display=swap") rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        pixel: ['"Press Start 2P"', 'cursive'],
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body class="bg-gray-100 font-sans">
-    <header class="bg-gray-800 text-white p-4 text-center">
-        <h1 class="text-2xl font-bold">Image Upload Application</h1>
+<body class="bg-gray-900 text-white font-sans">
+    <header class="border-b-4 border-purple-600 bg-gray-800 py-4">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-xl md:text-2xl font-pixel text-purple-400">Pixel<span class="text-green-400">Store</span></h1>
+                <nav class="hidden md:flex space-x-1">
+                    <a href="/" class="px-3 py-2 text-purple-300 hover:text-white hover:bg-purple-700 rounded-md transition">Home</a>
+                    <a href="/upload-file" class="px-3 py-2 text-purple-300 hover:text-white hover:bg-purple-700 rounded-md transition">Upload</a>
+                    <a href="/images" class="px-3 py-2 text-white bg-purple-700 rounded-md transition">Gallery</a>
+                    <a href="/create-order" class="px-3 py-2 text-purple-300 hover:text-white hover:bg-purple-700 rounded-md transition">Orders</a>
+                </nav>
+                <button class="md:hidden text-purple-300 hover:text-white">
+                    <svg xmlns="[http://www.w3.org/2000/svg"](http://www.w3.org/2000/svg") class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+        </div>
     </header>
     
-    <nav class="bg-gray-700 p-2 flex justify-center">
-        <a href="/" class="text-white px-4 py-2 mx-2 rounded hover:bg-gray-800 transition">Home</a>
-        <a href="/upload-file" class="text-white px-4 py-2 mx-2 rounded hover:bg-gray-800 transition">Upload</a>
-        <a href="/images" class="text-white px-4 py-2 mx-2 rounded hover:bg-gray-800 transition">Gallery</a>
-    </nav>
-    
-    <div class="max-w-6xl mx-auto p-4">
-        <h1 class="text-3xl font-bold text-gray-800 text-center my-8">Image Gallery</h1>
-        
-        {% if images and images|length > 0 %}
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {% for image in images %}
-                    <div class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition transform hover:-translate-y-1">
-                        <img src="{{ image.image_url }}" alt="Uploaded image" class="w-full h-64 object-cover">
-                        <div class="p-4">
-                            <h3 class="text-xl font-bold text-gray-800 mb-2">Image {{ loop.index }}</h3>
-                            <p class="text-gray-600">Click to view full size</p>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="bg-white rounded-lg shadow-md p-12 text-center">
-                <h2 class="text-2xl font-bold text-gray-800 mb-3">No images uploaded yet</h2>
-                <p class="text-gray-600 mb-6">Be the first to upload an image to the gallery!</p>
-                <a href="/upload-file" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition">
-                    Upload an Image
-                </a>
-            </div>
-        {% endif %}
+    <div class="md:hidden bg-gray-800 pb-3">
+        <nav class="flex flex-col px-4">
+            <a href="/" class="px-3 py-2 text-purple-300 hover:text-white hover:bg-purple-700 rounded-md transition">Home</a>
+            <a href="/upload-file" class="px-3 py-2 text-purple-300 hover:text-white hover:bg-purple-700 rounded-md transition">Upload</a>
+            <a href="/images" class="px-3 py-2 text-white bg-purple-700 rounded-md transition">Gallery</a>
+            <a href="/create-order" class="px-3 py-2 text-purple-300 hover:text-white hover:bg-purple-700 rounded-md transition">Orders</a>
+        </nav>
     </div>
     
-    <footer class="bg-gray-800 text-white text-center p-4 mt-8">
-        <p>&copy; 2025 Image Upload App. All rights reserved.</p>
+    <main class="py-12">
+        <div class="container mx-auto px-4">
+            <h1 class="text-2xl md:text-3xl font-pixel mb-8 text-center text-green-400">Image Gallery</h1>
+            
+            {% if images and images|length > 0 %}
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {% for image in images %}
+                        <div class="group">
+                            <div class="relative overflow-hidden rounded-lg border-2 border-purple-500 transform transition duration-300 hover:-translate-y-2 hover:shadow-lg hover:shadow-purple-500/20">
+                                <!-- Pixel frame effect -->
+                                <div class="absolute inset-0 border-4 border-gray-800 z-10 pointer-events-none"></div>
+                                
+                                <img src="{{ image.image_url }}" alt="Uploaded image" class="w-full h-64 object-cover transition duration-300 group-hover:scale-105">
+                                
+                                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900 to-transparent p-4">
+                                    <h3 class="text-lg font-bold text-white">Image {{ loop.index }}</h3>
+                                </div>
+                                
+                                <div class="absolute inset-0 bg-gradient-to-br from-purple-600/40 to-green-600/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center">
+                                    <a href="{{ image.image_url }}" target="_blank" class="px-4 py-2 bg-gray-800 rounded-md font-medium text-white border border-purple-400 hover:bg-gray-700 transition">View Full Size</a>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="mt-12 text-center">
+                    <a href="/upload-file" class="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-green-600 rounded-md font-medium text-white hover:from-purple-500 hover:to-green-500 transition">
+                        Upload More Images
+                    </a>
+                </div>
+            {% else %}
+                <div class="bg-gray-800 p-12 rounded-lg border-2 border-purple-500 max-w-2xl mx-auto text-center">
+                    <svg xmlns="[http://www.w3.org/2000/svg"](http://www.w3.org/2000/svg") class="h-16 w-16 mx-auto text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <h2 class="text-xl font-pixel text-purple-400 mb-3">Gallery Empty</h2>
+                    <p class="text-gray-300 mb-6">No images have been uploaded yet. Be the first to add something to the gallery!</p>
+                    <a href="/upload-file" class="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-green-600 rounded-md font-medium text-white hover:from-purple-500 hover:to-green-500 transition">
+                        Upload an Image
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+    
+    <footer class="bg-gray-800 border-t-4 border-purple-600 py-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-400 mb-4 md:mb-0">&copy; 2025 PixelStore. All rights reserved.</p>
+                <div class="flex space-x-4">
+                    <a href="#" class="text-gray-400 hover:text-purple-400 transition">Privacy</a>
+                    <a href="#" class="text-gray-400 hover:text-purple-400 transition">Terms</a>
+                    <a href="#" class="text-gray-400 hover:text-purple-400 transition">Contact</a>
+                </div>
+            </div>
+        </div>
     </footer>
-</body>
-</html>
+    
+    <script>
+        // Mobile menu toggle
+        document.querySelector('button').addEventListener('click', function() {
+            const nav = document.querySelector('.md\\:hidden nav');
+            nav.classList.toggle('hidden');
+        });
