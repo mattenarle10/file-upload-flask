@@ -304,6 +304,17 @@ def create_order():
     
     return render_template('create_order.html', products=products)
 
+@app.route('/clear-mongodb', methods=['GET'])
+def clear_mongodb():
+    try:
+        client, database, collection = create_mongodb_connection("file-uploads")
+        result = collection.delete_many({})
+        deleted_count = result.deleted_count
+        client.close()
+        return jsonify({"message": f"Deleted {deleted_count} documents from MongoDB", "success": True})
+    except Exception as e:
+        return jsonify({"message": f"Error: {str(e)}", "success": False})
+
 
 # Simple redirect routes for better navigation
 @app.route('/home')
