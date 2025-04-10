@@ -289,7 +289,7 @@ def create_order():
         flash('Order created successfully')
         return redirect(url_for('show_uploaded_images'))
     
-    # For GET requests, fetch products to display in dropdown
+    # For GET requests, fetch products with images to display in dropdown
     conn = psycopg2.connect(
         host=os.environ["POSTGRESQL_DB_HOST"],
         database=os.environ["POSTGRESQL_DB_DATABASE_NAME"],
@@ -297,12 +297,72 @@ def create_order():
         password=os.environ['POSTGRESQL_DB_PASSWORD']
     )
     cur = conn.cursor()
-    cur.execute("SELECT id, name, stock_count FROM products")
+    
+    # Get all products with their details including MongoDB image ID
+    cur.execute("""
+        SELECT p.id, p.name, p.stock_count, p.image_mongodb_id 
+        FROM products p
+    """)
     products = cur.fetchall()
+    
+    # Get all images from MongoDB
+    client, database, collection = create_mongodb_connection("file-uploads")
+    all_images = list(collection.find({}))
+    
+    # Prepare data for template
+    parsed_products = []
+    
+    # Process products with their images
+    for product in products:
+        product_id = product[0]
+        product_name = product[1]
+        stock_count = product[2]
+        image_mongodb_id = product[3]
+        
+        # Find matching image for this product
+        matching_image = None
+        
+        # Try to find by product_id in MongoDB
+        for img in all_images:
+            if 'product_id' in img and str(img['product_id']) == str(product_id):
+                matching_image = img
+                break
+        
+        # If no match by product_id, try by image_mongodb_id
+        if not matching_image and image_mongodb_id:
+            for img in all_images:
+                if '_id' in img and str(img['_id']) == image_mongodb_id:
+                    matching_image = img
+                    break
+        
+        # If we found a matching image
+        if matching_image and 'file_path' in matching_image:
+            img_url = url_for('download_file', name=matching_image['file_path'])
+            
+            product_data = {
+                "product_id": product_id,
+                "product_name": product_name,
+                "stock_count": stock_count,
+                "image_url": img_url,
+                "file_path": matching_image['file_path']
+            }
+        else:
+            # No matching image found
+            product_data = {
+                "product_id": product_id,
+                "product_name": product_name,
+                "stock_count": stock_count,
+                "image_url": "",
+                "file_path": ""
+            }
+        
+        parsed_products.append(product_data)
+    
+    client.close()
     cur.close()
     conn.close()
     
-    return render_template('create_order.html', products=products)
+    return render_template('create_order.html', products=parsed_products)
 
 @app.route('/clear-mongodb', methods=['GET'])
 def clear_mongodb():
