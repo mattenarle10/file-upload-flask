@@ -223,14 +223,115 @@ def download_file(name):
 @app.route('/create-order', methods=['GET', 'POST'])
 def create_order():
     if request.method == 'POST':
-        product_id = request.form.get('product_id')
-        order_quantity = int(request.form.get('order_quantity', 1))
-        
-        if not product_id:
-            flash('Product ID is required')
-            return redirect(request.url)
+        try:
+            # Get form data with validation
+            product_id = request.form.get('product_id')
+            if not product_id:
+                flash('Product ID is required')
+                return redirect(request.url)
+                
+            # Safely convert order_quantity to integer
+            try:
+                order_quantity = int(request.form.get('order_quantity', 1))
+                if order_quantity <= 0:
+                    flash('Order quantity must be positive')
+                    return redirect(request.url)
+            except ValueError:
+                flash('Invalid order quantity')
+                return redirect(request.url)
+                
+            # Connect to PostgreSQL with error handling
+            try:
+                conn = psycopg2.connect(
+                    host=os.environ["POSTGRESQL_DB_HOST"],
+                    database=os.environ["POSTGRESQL_DB_DATABASE_NAME"],
+                    user=os.environ['POSTGRESQL_DB_USERNAME'],
+                    password=os.environ['POSTGRESQL_DB_PASSWORD']
+                )
+                conn.autocommit = False  # Start transaction mode
+                cur = conn.cursor()
+            except psycopg2.Error as e:
+                app.logger.error(f"Database connection error: {e}")
+                flash('Unable to connect to database')
+                return redirect(request.url)
             
-        # Connect to PostgreSQL
+            try:
+                # Verify orders table exists
+                cur.execute("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_name = 'orders'
+                    )
+                """)
+                table_exists = cur.fetchone()[0]
+                
+                if not table_exists:
+                    # Create orders table if it doesn't exist
+                    cur.execute("""
+                        CREATE TABLE orders (
+                            id SERIAL PRIMARY KEY,
+                            product_id INTEGER REFERENCES products(id),
+                            quantity INTEGER NOT NULL,
+                            order_date TIMESTAMP NOT NULL
+                        )
+                    """)
+                    conn.commit()
+                
+                # First check if there's enough stock
+                cur.execute("SELECT name, stock_count FROM products WHERE id = %s", (product_id,))
+                result = cur.fetchone()
+                
+                if not result:
+                    conn.rollback()
+                    cur.close()
+                    conn.close()
+                    flash('Product not found')
+                    return redirect(url_for('create_order'))
+                    
+                product_name, current_stock = result
+                
+                if current_stock < order_quantity:
+                    conn.rollback()
+                    cur.close()
+                    conn.close()
+                    flash(f'Not enough stock available for {product_name}. Available: {current_stock}')
+                    return redirect(url_for('create_order'))
+                
+                # Update the stock count by subtracting the order quantity
+                new_stock = current_stock - order_quantity
+                cur.execute("UPDATE products SET stock_count = %s WHERE id = %s", 
+                           (new_stock, product_id))
+                
+                # Create order record
+                cur.execute("""
+                    INSERT INTO orders (product_id, quantity, order_date) 
+                    VALUES (%s, %s, %s) RETURNING id
+                    """, (product_id, order_quantity, datetime.now()))
+                
+                order_id = cur.fetchone()[0]
+                
+                # Commit the transaction
+                conn.commit()
+                
+                flash(f'Order #{order_id} created successfully for {product_name}')
+                return redirect(url_for('show_uploaded_images'))
+                
+            except psycopg2.Error as e:
+                conn.rollback()
+                app.logger.error(f"Database error: {e}")
+                flash(f'Error creating order: {str(e)}')
+                return redirect(request.url)
+            finally:
+                cur.close()
+                conn.close()
+                
+        except Exception as e:
+            app.logger.error(f"Unexpected error in create_order: {e}")
+            flash('An unexpected error occurred')
+            return redirect(request.url)
+    
+    # For GET requests, fetch products with images to display in dropdown
+    try:
         conn = psycopg2.connect(
             host=os.environ["POSTGRESQL_DB_HOST"],
             database=os.environ["POSTGRESQL_DB_DATABASE_NAME"],
@@ -239,137 +340,76 @@ def create_order():
         )
         cur = conn.cursor()
         
-        # First check if there's enough stock
-        cur.execute("SELECT stock_count FROM products WHERE id = %s", (product_id,))
-        result = cur.fetchone()
+        # Get all products with their details including MongoDB image ID
+        cur.execute("""
+            SELECT p.id, p.name, p.stock_count, p.image_mongodb_id 
+            FROM products p
+        """)
+        products = cur.fetchall()
         
-        if not result:
-            cur.close()
-            conn.close()
-            flash('Product not found')
-            return redirect(url_for('create_order'))
+        # Get all images from MongoDB
+        client, database, collection = create_mongodb_connection("file-uploads")
+        all_images = list(collection.find({}))
+        
+        # Prepare data for template
+        parsed_products = []
+        
+        # Process products with their images
+        for product in products:
+            product_id = product[0]
+            product_name = product[1]
+            stock_count = product[2]
+            image_mongodb_id = product[3]
             
-        current_stock = result[0]
-        
-        if current_stock < order_quantity:
-            cur.close()
-            conn.close()
-            flash('Not enough stock available')
-            return redirect(url_for('create_order'))
-        
-        # Update the stock count by subtracting the order quantity
-        new_stock = current_stock - order_quantity
-        cur.execute("UPDATE products SET stock_count = %s WHERE id = %s", 
-                   (new_stock, product_id))
-        
-        # Create order record (assuming you have an orders table)
-        # If you don't have an orders table yet, you'd need to create it
-        try:
-            cur.execute("""
-                INSERT INTO orders (product_id, quantity, order_date) 
-                VALUES (%s, %s, %s)
-                """, (product_id, order_quantity, datetime.now()))
-        except psycopg2.errors.UndefinedTable:
-            # If orders table doesn't exist, create it
-            conn.rollback()  # Roll back the failed INSERT
+            # Find matching image for this product
+            matching_image = None
             
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS orders (
-                    id SERIAL PRIMARY KEY,
-                    product_id INTEGER REFERENCES products(id),
-                    quantity INTEGER NOT NULL,
-                    order_date TIMESTAMP NOT NULL
-                )
-            """)
-            conn.commit()
+            # Try to find by product_id in MongoDB
+            for img in all_images:
+                if 'product_id' in img and str(img['product_id']) == str(product_id):
+                    matching_image = img
+                    break
             
-            # Try insert again
-            cur.execute("""
-                INSERT INTO orders (product_id, quantity, order_date) 
-                VALUES (%s, %s, %s)
-                """, (product_id, order_quantity, datetime.now()))
+            # If no match by product_id, try by image_mongodb_id
+            if not matching_image and image_mongodb_id:
+                for img in all_images:
+                    if '_id' in img and str(img['_id']) == image_mongodb_id:
+                        matching_image = img
+                        break
+            
+            # If we found a matching image
+            if matching_image and 'file_path' in matching_image:
+                img_url = url_for('download_file', name=matching_image['file_path'])
+                
+                product_data = {
+                    "product_id": product_id,
+                    "product_name": product_name,
+                    "stock_count": stock_count,
+                    "image_url": img_url,
+                    "file_path": matching_image['file_path']
+                }
+            else:
+                # No matching image found
+                product_data = {
+                    "product_id": product_id,
+                    "product_name": product_name,
+                    "stock_count": stock_count,
+                    "image_url": "",
+                    "file_path": ""
+                }
+            
+            parsed_products.append(product_data)
         
-        conn.commit()
+        client.close()
         cur.close()
         conn.close()
         
-        flash('Order created successfully')
-        return redirect(url_for('show_uploaded_images'))
-    
-    # For GET requests, fetch products with images to display in dropdown
-    conn = psycopg2.connect(
-        host=os.environ["POSTGRESQL_DB_HOST"],
-        database=os.environ["POSTGRESQL_DB_DATABASE_NAME"],
-        user=os.environ['POSTGRESQL_DB_USERNAME'],
-        password=os.environ['POSTGRESQL_DB_PASSWORD']
-    )
-    cur = conn.cursor()
-    
-    # Get all products with their details including MongoDB image ID
-    cur.execute("""
-        SELECT p.id, p.name, p.stock_count, p.image_mongodb_id 
-        FROM products p
-    """)
-    products = cur.fetchall()
-    
-    # Get all images from MongoDB
-    client, database, collection = create_mongodb_connection("file-uploads")
-    all_images = list(collection.find({}))
-    
-    # Prepare data for template
-    parsed_products = []
-    
-    # Process products with their images
-    for product in products:
-        product_id = product[0]
-        product_name = product[1]
-        stock_count = product[2]
-        image_mongodb_id = product[3]
+        return render_template('create_order.html', products=parsed_products)
         
-        # Find matching image for this product
-        matching_image = None
-        
-        # Try to find by product_id in MongoDB
-        for img in all_images:
-            if 'product_id' in img and str(img['product_id']) == str(product_id):
-                matching_image = img
-                break
-        
-        # If no match by product_id, try by image_mongodb_id
-        if not matching_image and image_mongodb_id:
-            for img in all_images:
-                if '_id' in img and str(img['_id']) == image_mongodb_id:
-                    matching_image = img
-                    break
-        
-        # If we found a matching image
-        if matching_image and 'file_path' in matching_image:
-            img_url = url_for('download_file', name=matching_image['file_path'])
-            
-            product_data = {
-                "product_id": product_id,
-                "product_name": product_name,
-                "stock_count": stock_count,
-                "image_url": img_url,
-                "file_path": matching_image['file_path']
-            }
-        else:
-            # No matching image found
-            product_data = {
-                "product_id": product_id,
-                "product_name": product_name,
-                "stock_count": stock_count,
-                "image_url": "",
-                "file_path": ""
-            }
-        
-        parsed_products.append(product_data)
-    
-    client.close()
-    cur.close()
-    conn.close()
-    
-    return render_template('create_order.html', products=parsed_products)
+    except Exception as e:
+        app.logger.error(f"Error loading products: {e}")
+        flash('Error loading products')
+        return render_template('create_order.html', products=[])
 
 @app.route('/clear-mongodb', methods=['GET'])
 def clear_mongodb():
