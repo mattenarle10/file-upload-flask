@@ -112,12 +112,7 @@ def upload_file():
 
 @app.route('/images', methods=['GET'])
 def show_uploaded_images():
-    # Get images from MongoDB
-    client, database, collection = create_mongodb_connection("file-uploads")
-    mongo_data = list(collection.find({}))
-    client.close()
-    
-    # Connect to PostgreSQL to get product details
+    # Connect to PostgreSQL to get all product details
     conn = psycopg2.connect(
         host=os.environ["POSTGRESQL_DB_HOST"],
         database=os.environ["POSTGRESQL_DB_DATABASE_NAME"],
@@ -126,33 +121,42 @@ def show_uploaded_images():
     )
     cur = conn.cursor()
     
-    # Get all products
-    cur.execute("SELECT id, name, stock_count FROM products")
-    products = {}
-    for row in cur.fetchall():
-        products[str(row[0])] = {'name': row[1], 'stock_count': row[2]}
+    # Get all products with their details
+    cur.execute("""
+        SELECT p.id, p.name, p.stock_count, p.image_mongodb_id 
+        FROM products p
+    """)
+    products = cur.fetchall()
     
+    # Get images from MongoDB
+    client, database, collection = create_mongodb_connection("file-uploads")
+    
+    # Prepare data for template
+    parsed = []
+    for product in products:
+        product_id = product[0]
+        product_name = product[1]
+        stock_count = product[2]
+        image_mongodb_id = product[3]
+        
+        # Find the corresponding image in MongoDB
+        mongo_image = collection.find_one({"file_path": {"$exists": True}})
+        
+        if mongo_image:
+            img_url = url_for('download_file', name=mongo_image['file_path'])
+            
+            image_data = {
+                "image_url": img_url,
+                "product_id": product_id,
+                "product_name": product_name,
+                "stock_count": stock_count
+            }
+            
+            parsed.append(image_data)
+    
+    client.close()
     cur.close()
     conn.close()
-    
-    # Prepare data for template with product details
-    parsed = []
-    for d in mongo_data:
-        img_url = url_for('download_file', name=d['file_path'])
-        product_id = str(d.get('product_id', ''))
-        
-        image_data = {
-            "image_url": img_url,
-            "file_path": d['file_path']
-        }
-        
-        # Add product details if available
-        if product_id and product_id in products:
-            image_data["product_id"] = product_id
-            image_data["product_name"] = products[product_id]['name']
-            image_data["stock_count"] = products[product_id]['stock_count']
-        
-        parsed.append(image_data)
     
     if ENV_MODE == "backend":
         return jsonify(parsed)
