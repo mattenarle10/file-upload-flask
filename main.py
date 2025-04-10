@@ -230,6 +230,12 @@ def create_order():
                 flash('Product ID is required')
                 return redirect(request.url)
                 
+            # Get customer name
+            customer_name = request.form.get('customer_name', '').strip()
+            if not customer_name:
+                flash('Customer name is required')
+                return redirect(request.url)
+                
             # Safely convert order_quantity to integer
             try:
                 order_quantity = int(request.form.get('order_quantity', 1))
@@ -241,42 +247,16 @@ def create_order():
                 return redirect(request.url)
                 
             # Connect to PostgreSQL with error handling
-            try:
-                conn = psycopg2.connect(
-                    host=os.environ["POSTGRESQL_DB_HOST"],
-                    database=os.environ["POSTGRESQL_DB_DATABASE_NAME"],
-                    user=os.environ['POSTGRESQL_DB_USERNAME'],
-                    password=os.environ['POSTGRESQL_DB_PASSWORD']
-                )
-                conn.autocommit = False  # Start transaction mode
-                cur = conn.cursor()
-            except psycopg2.Error as e:
-                app.logger.error(f"Database connection error: {e}")
-                flash('Unable to connect to database')
-                return redirect(request.url)
+            conn = psycopg2.connect(
+                host=os.environ["POSTGRESQL_DB_HOST"],
+                database=os.environ["POSTGRESQL_DB_DATABASE_NAME"],
+                user=os.environ['POSTGRESQL_DB_USERNAME'],
+                password=os.environ['POSTGRESQL_DB_PASSWORD']
+            )
+            conn.autocommit = False  # Start transaction mode
+            cur = conn.cursor()
             
             try:
-                # Verify orders table exists
-                cur.execute("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_name = 'orders'
-                    )
-                """)
-                table_exists = cur.fetchone()[0]
-                
-                if not table_exists:
-                    # Create orders table if it doesn't exist
-                    cur.execute("""
-                        CREATE TABLE orders (
-                            id SERIAL PRIMARY KEY,
-                            product_id INTEGER REFERENCES products(id),
-                            quantity INTEGER NOT NULL,
-                            order_date TIMESTAMP NOT NULL
-                        )
-                    """)
-                    conn.commit()
-                
                 # First check if there's enough stock
                 cur.execute("SELECT name, stock_count FROM products WHERE id = %s", (product_id,))
                 result = cur.fetchone()
@@ -297,24 +277,34 @@ def create_order():
                     flash(f'Not enough stock available for {product_name}. Available: {current_stock}')
                     return redirect(url_for('create_order'))
                 
-                # Update the stock count by subtracting the order quantity
+                # Calculate order total (simple example)
+                unit_price = 10.00  # You might want to add a price column to products
+                total = unit_price * order_quantity
+                
+                # Create order record - simplified without tax
+                cur.execute("""
+                    INSERT INTO orders (customer_name, total, tax, pretax_amount) 
+                    VALUES (%s, %s, %s, %s) RETURNING id
+                    """, (customer_name, total, 0, total))  # Tax is 0, pretax_amount equals total
+                
+                order_id = cur.fetchone()[0]
+                
+                # Create stock movement record
+                cur.execute("""
+                    INSERT INTO stock_movements (product_id, order_id, quantity) 
+                    VALUES (%s, %s, %s)
+                    """, (product_id, order_id, order_quantity))
+                
+                # Update product stock
                 new_stock = current_stock - order_quantity
                 cur.execute("UPDATE products SET stock_count = %s WHERE id = %s", 
                            (new_stock, product_id))
-                
-                # Create order record
-                cur.execute("""
-                    INSERT INTO orders (product_id, quantity, order_date) 
-                    VALUES (%s, %s, %s) RETURNING id
-                    """, (product_id, order_quantity, datetime.now()))
-                
-                order_id = cur.fetchone()[0]
                 
                 # Commit the transaction
                 conn.commit()
                 
                 flash(f'Order #{order_id} created successfully for {product_name}')
-                return redirect(url_for('create_order'))  # Redirect back to see the new order in the list
+                return redirect(url_for('create_order'))
                 
             except psycopg2.Error as e:
                 conn.rollback()
@@ -403,64 +393,59 @@ def create_order():
         # Fetch recent orders for display
         orders = []
         try:
-            # Check if orders table exists first
+            # Get recent orders with product details through stock_movements
             cur.execute("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'orders'
-                )
+                SELECT o.id, sm.product_id, p.name, sm.quantity, o.created_at, p.image_mongodb_id, o.total, o.customer_name 
+                FROM orders o
+                JOIN stock_movements sm ON o.id = sm.order_id
+                JOIN products p ON sm.product_id = p.id
+                ORDER BY o.created_at DESC
+                LIMIT 10
             """)
-            table_exists = cur.fetchone()[0]
             
-            if table_exists:
-                # Get recent orders with product details
-                cur.execute("""
-                    SELECT o.id, o.product_id, p.name, o.quantity, o.order_date, p.image_mongodb_id 
-                    FROM orders o
-                    JOIN products p ON o.product_id = p.id
-                    ORDER BY o.order_date DESC
-                    LIMIT 10
-                """)
+            recent_orders = cur.fetchall()
+            
+            # Process orders with product images
+            for order in recent_orders:
+                order_id = order[0]
+                product_id = order[1]
+                product_name = order[2]
+                quantity = order[3]
+                order_date = order[4]
+                image_mongodb_id = order[5]
+                total = order[6]
+                customer_name = order[7]
                 
-                recent_orders = cur.fetchall()
+                # Find matching image for this product
+                image_url = ""
                 
-                # Process orders with product images
-                for order in recent_orders:
-                    order_id = order[0]
-                    product_id = order[1]
-                    product_name = order[2]
-                    quantity = order[3]
-                    order_date = order[4]
-                    image_mongodb_id = order[5]
-                    
-                    # Find matching image for this product
-                    image_url = ""
-                    
-                    # Try to find by product_id in MongoDB
+                # Try to find by product_id in MongoDB
+                for img in all_images:
+                    if 'product_id' in img and str(img['product_id']) == str(product_id):
+                        if 'file_path' in img:
+                            image_url = url_for('download_file', name=img['file_path'])
+                        break
+                
+                # If no match by product_id, try by image_mongodb_id
+                if not image_url and image_mongodb_id:
                     for img in all_images:
-                        if 'product_id' in img and str(img['product_id']) == str(product_id):
+                        if '_id' in img and str(img['_id']) == image_mongodb_id:
                             if 'file_path' in img:
                                 image_url = url_for('download_file', name=img['file_path'])
                             break
-                    
-                    # If no match by product_id, try by image_mongodb_id
-                    if not image_url and image_mongodb_id:
-                        for img in all_images:
-                            if '_id' in img and str(img['_id']) == image_mongodb_id:
-                                if 'file_path' in img:
-                                    image_url = url_for('download_file', name=img['file_path'])
-                                break
-                    
-                    order_data = {
-                        "order_id": order_id,
-                        "product_id": product_id,
-                        "product_name": product_name,
-                        "quantity": quantity,
-                        "order_date": order_date,
-                        "image_url": image_url
-                    }
-                    
-                    orders.append(order_data)
+                
+                order_data = {
+                    "order_id": order_id,
+                    "product_id": product_id,
+                    "product_name": product_name,
+                    "quantity": quantity,
+                    "order_date": order_date,
+                    "image_url": image_url,
+                    "total": total,
+                    "customer_name": customer_name
+                }
+                
+                orders.append(order_data)
         except Exception as e:
             app.logger.error(f"Error fetching orders: {e}")
             # Continue without orders if there's an error
