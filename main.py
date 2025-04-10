@@ -143,19 +143,15 @@ def show_uploaded_images():
         
         image_data = {
             "image_url": img_url,
-            "product_id": product_id,
             "file_path": d['file_path']
         }
         
         # Add product details if available
         if product_id and product_id in products:
+            image_data["product_id"] = product_id
             image_data["product_name"] = products[product_id]['name']
             image_data["stock_count"] = products[product_id]['stock_count']
-        else:
-            # Use MongoDB product_name if available, otherwise Unknown
-            image_data["product_name"] = d.get('product_name', 'Unknown Product')
-            image_data["stock_count"] = 0
-            
+        
         parsed.append(image_data)
     
     if ENV_MODE == "backend":
