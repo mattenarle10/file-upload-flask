@@ -83,6 +83,13 @@
                                 {% endfor %}
                             </select>
                         </div>
+
+                        <div>
+                            <label for="customer_name" class="block text-sm font-medium text-gray-300 mb-2">Customer Name</label>
+                            <input type="text" id="customer_name" name="customer_name" required
+                                   class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                   placeholder="Enter customer name">
+                        </div>
                         
                         <div>
                             <label for="order_quantity" class="block text-sm font-medium text-gray-300 mb-2">Order Quantity</label>
@@ -93,6 +100,7 @@
                         
                         <!-- Product Preview Section -->
                         <div id="product-preview" class="mt-6 hidden">
+                          
                             <label class="block text-sm font-medium text-gray-300 mb-2">Product Preview</label>
                             <div class="border-2 border-purple-500 rounded-md p-4 bg-gray-700">
                                 <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
@@ -101,6 +109,7 @@
                                     </div>
                                     <div class="w-full md:w-1/2 space-y-2">
                                         <h3 id="product-name" class="text-lg font-pixel text-green-400"></h3>
+                                          <p class="text-sm text-gray-300">Customer: <span id="display-customer" class="font-pixel text-white"></span></p>
                                         <p class="text-sm text-gray-300">Stock: <span id="product-stock" class="font-pixel"></span></p>
                                         <p class="text-sm text-gray-300">Order Quantity: <span id="display-quantity" class="font-pixel text-purple-400">1</span></p>
                                     </div>
@@ -138,8 +147,10 @@
                 <thead class="bg-gray-700">
                     <tr>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Order ID</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Customer</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Product</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Quantity</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Total</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Date</th>
                     </tr>
                 </thead>
@@ -148,6 +159,9 @@
                     <tr class="hover:bg-gray-700 transition-colors">
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm font-pixel text-green-400">#{{ order.order_id }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-white">{{ order.customer_name }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center">
@@ -171,8 +185,11 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm font-pixel text-purple-400">{{ order.quantity }}</div>
                         </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-green-400">${{ "%.2f"|format(order.total) }}</div>
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                            {{ order.order_date.strftime('%Y-%m-%d %H:%M') }}
+                            {{ order.order_date.strftime('%Y-%m-%d') }}
                         </td>
                     </tr>
                     {% endfor %}
@@ -283,6 +300,20 @@
                 noProductSelected.classList.remove('hidden');
             }
         }
+        // Add this to your existing JavaScript at the bottom
+document.getElementById('customer_name').addEventListener('input', updateCustomerDisplay);
+
+function updateCustomerDisplay() {
+    const customerInput = document.getElementById('customer_name');
+    const displayCustomer = document.getElementById('display-customer');
+    
+    if (displayCustomer) {
+        displayCustomer.textContent = customerInput.value || 'Not specified';
+    }
+}
+
+// Call this at the end of updateProductPreview function
+updateCustomerDisplay();
     </script>
 </body>
 </html>
