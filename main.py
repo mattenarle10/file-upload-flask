@@ -304,6 +304,15 @@ def create_order():
                 conn.commit()
                 
                 flash(f'Order #{order_id} created successfully for {product_name}')
+                
+                # Instead of redirecting, we'll render the template directly with the updated data
+                # This ensures the new order appears in the list without requiring a refresh
+                
+                # Close the current connection
+                cur.close()
+                conn.close()
+                
+                # Return to the GET part of the function to fetch fresh data
                 return redirect(url_for('create_order'))
                 
             except psycopg2.Error as e:
@@ -312,8 +321,10 @@ def create_order():
                 flash(f'Error creating order: {str(e)}')
                 return redirect(request.url)
             finally:
-                cur.close()
-                conn.close()
+                if cur and not cur.closed:
+                    cur.close()
+                if conn and not conn.closed:
+                    conn.close()
                 
         except Exception as e:
             app.logger.error(f"Unexpected error in create_order: {e}")
