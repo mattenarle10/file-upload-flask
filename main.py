@@ -315,6 +315,17 @@ def clear_mongodb():
     except Exception as e:
         return jsonify({"message": f"Error: {str(e)}", "success": False})
 
+@app.route('/image/<image_id>')
+def get_image(image_id):
+    client, database, collection = create_mongodb_connection("file-uploads")
+    image_doc = collection.find_one({"_id": ObjectId(image_id)})
+    client.close()
+    
+    if image_doc and "file_path" in image_doc:
+        file_path = os.path.join(os.environ["UPLOAD_DIRECTORY"], image_doc["file_path"])
+        return send_file(file_path)
+    else:
+        return "Image not found", 404
 
 # Simple redirect routes for better navigation
 @app.route('/home')
