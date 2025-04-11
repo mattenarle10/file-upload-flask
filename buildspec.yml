@@ -1,0 +1,31 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+  pre_build:
+    commands:
+      - echo Installing dependencies...
+      - pip install -r requirements.txt
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Running tests...
+      # Add test commands here if you have tests
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Preparing deployment package...
+      - chmod +x scripts/*.sh
+
+artifacts:
+  files:
+    - appspec.yml
+    - scripts/**/*
+    - main.py
+    - requirements.txt
+    - templates/**/*
+    - static/**/*
+    - "**/*"
+  discard-paths: no
