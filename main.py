@@ -517,3 +517,7 @@ def upload():
 @app.route('/order')
 def order():
     return redirect(url_for('create_order'))
+
+@app.route("/health")
+def health():
+    return "OK", 200
