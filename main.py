@@ -6,6 +6,8 @@ from datetime import datetime
 from flask import Flask, flash, request, redirect, url_for, render_template, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
 from db.mongodb.mongodb_connection import create_mongodb_connection
+from aws_xray_sdk.core import xray_recorder, patch_all
+from aws_xray_sdk.ext.flask.middleware import XRayMiddleware
 
 UPLOAD_FOLDER = os.getenv("UPLOAD_DIRECTORY")
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
@@ -14,6 +16,10 @@ ENV_MODE = os.getenv("ENV_MODE")
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key")  # Added secret key for flash messages
+
+xray_recorder.configure(service='file-upload-flask')  # You can change the service name if you want
+XRayMiddleware(app, xray_recorder)
+patch_all()  # Automatically traces supported libraries (requests, psycopg2, etc.)
 
 @app.route("/")
 def index():
