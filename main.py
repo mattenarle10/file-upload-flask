@@ -17,9 +17,9 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key")  # Added secret key for flash messages
 
-xray_recorder.configure(service='file-upload-flask')  # You can change the service name if you want
+xray_recorder.configure(service='file-upload-flask') 
 XRayMiddleware(app, xray_recorder)
-patch_all()  # Automatically traces supported libraries (requests, psycopg2, etc.)
+patch_all() 
 
 @app.route("/")
 def index():
