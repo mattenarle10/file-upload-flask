@@ -91,3 +91,10 @@ def order():
 @app.route("/health")
 def health():
     return "OK", 200
+
+@app.route("/xray-test")
+def xray_test():
+    from aws_xray_sdk.core import xray_recorder
+    seg = xray_recorder.begin_subsegment("manual-test")
+    xray_recorder.end_subsegment()
+    return "X-Ray test!", 200
